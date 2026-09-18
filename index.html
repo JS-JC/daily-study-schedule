@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日学习任务安排</title>
+<style>
+  :root{
+    --bg1:#eef3fb; --bg2:#e3eaf7;
+    --card:#ffffff; --ink:#1f2d3d; --sub:#5b6b7d; --line:#e3e9f2;
+    --accent:#3561e0; --ok:#27ae60;
+    --shadow:0 10px 30px rgba(31,45,61,.08); --radius:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed;
+    color:var(--ink); min-height:100vh; padding:28px 16px 60px;
+  }
+  .wrap{max-width:1060px;margin:0 auto}
+  header.top{text-align:center;margin-bottom:10px}
+  header.top h1{font-size:30px;letter-spacing:1px}
+  header.top .today{margin-top:8px;color:var(--sub);font-size:15px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+  header.top .today .now{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
+  .unlock-note{
+    text-align:center;font-size:13px;color:#a06800;background:#fff7e0;border:1px solid #ffe3a0;
+    padding:7px 12px;border-radius:999px;width:fit-content;margin:14px auto 0;display:none;
+  }
+
+  .status-bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px auto 24px}
+  .pill{padding:8px 16px;border-radius:999px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;background:#fff;box-shadow:var(--shadow)}
+  .pill .dot{width:9px;height:9px;border-radius:50%;background:#b9c2cf}
+  .pill .dot.act{background:var(--ok);box-shadow:0 0 0 4px rgba(39,174,96,.18);animation:pulse 1.6s infinite}
+  .pill .dot.rest{background:#f5a623}
+  @keyframes pulse{50%{transform:scale(1.35)}}
+
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  @media(max-width:860px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  .card.active{outline:3px solid var(--accent)}
+  .card-head{padding:15px 18px;color:#fff;position:relative}
+  .card-head.morning{background:linear-gradient(135deg,#5aa0e6,#3f7ed6)}
+  .card-head.afternoon{background:linear-gradient(135deg,#8a72e0,#6a4fd0)}
+  .card-head.evening{background:linear-gradient(135deg,#3bb0b0,#279a9a)}
+  .card-head .name{font-size:19px;font-weight:700}
+  .card-head .time{font-size:13px;opacity:.92;margin-top:4px}
+  .card-head .stage{position:absolute;top:13px;right:16px;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.22);font-weight:600;display:none}
+  .count-box{padding:14px 18px 4px;text-align:center}
+  .count-box .label{font-size:12px;color:var(--sub)}
+  .count-box .num{font-size:38px;font-weight:800;font-variant-numeric:tabular-nums}
+  .count-box .num.slot-active{color:var(--accent)}
+
+  .items{padding:6px 16px 4px}
+  .item{display:flex;align-items:center;gap:10px;padding:10px 6px}
+  .item + .item{border-top:1px dashed var(--line)}
+  .chk{width:22px;height:22px;border-radius:6px;border:2px solid #c3cddb;flex:none;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px}
+  .item.done .chk{background:var(--ok);border-color:var(--ok)}
+  .item .txt{flex:1;font-size:15px}
+  .item .sub{display:block;font-size:12px;color:var(--sub);margin-top:2px;font-weight:400}
+  .item.done .txt{color:var(--ink)}
+
+  .foot{padding:12px 16px 16px}
+  .foot .prog span{font-size:13px;color:var(--sub)}
+  .foot .prog b{font-size:15px}
+  .bar{height:6px;border-radius:3px;background:#eef2f8;margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;transition:.3s;background:var(--ok)}
+
+  .settings{background:linear-gradient(180deg,#ffffff,#f7fbff);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 26px 22px;border:1px solid var(--line);height:100%;display:flex;flex-direction:column}
+  .settings h2{font-size:17px;margin-bottom:14px;text-align:center;flex:none}
+  .opt{display:flex;align-items:center;gap:12px;padding:10px 0;flex-wrap:wrap}
+  .opt + .opt{border-top:1px dashed var(--line)}
+  .opt .lbl{flex:1;font-size:14px;color:var(--sub)}
+  .opt .lbl b{color:var(--ink)}
+  .switch{position:relative;width:46px;height:26px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:#cfd8e3;border-radius:999px;cursor:pointer;transition:.2s}
+  .slider::before{content:"";position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch input:checked + .slider{background:var(--accent)}
+  .switch input:checked + .slider::before{transform:translateX(20px)}
+  select,input[type=number]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:14px;color:var(--ink)}
+  .btn-test{padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  .resets{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+  .btn-ghost{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;cursor:pointer;color:var(--sub)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* -------- 学习计时器 -------- */
+  .timer-card{margin:18px 0 26px;width:100%;border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 26px 24px;border:1px solid var(--line);background:linear-gradient(180deg,#ffffff,#f6f9fe)}
+  .timer-head{display:flex;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;font-size:18px;font-weight:700;margin-bottom:18px}
+  .timer-head .timer-sub{font-size:13px;color:var(--sub);font-weight:400}
+  .timer-body{display:flex;gap:8px;align-items:center;justify-content:center;flex-direction:column;flex-wrap:wrap}
+  @media(max-width:700px){.timer-body{gap:6px}}
+  .ring-wrap{position:relative;width:212px;height:212px;flex:none}
+  .ring{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring-bg{fill:none;stroke:#eaeff7;stroke-width:13}
+  .ring-fg{fill:none;stroke:var(--accent);stroke-width:13;stroke-linecap:round;stroke-dasharray:615.75;stroke-dashoffset:0;transition:stroke-dashoffset .25s linear,stroke .3s}
+  .mode-rest .ring-fg{stroke:#f5a623}
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .timer-mode{font-size:13px;font-weight:800;letter-spacing:3px;color:var(--accent);background:rgba(53,97,224,.1);padding:3px 13px;border-radius:999px}
+  .mode-rest .timer-mode{color:#e08e17;background:rgba(245,166,35,.14)}
+  .timer-num{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .timer-state{font-size:12px;color:var(--sub)}
+  .timer-controls{width:100%;max-width:540px;margin:10px auto 0}
+  .ctl-label{font-size:13px;font-weight:700;color:var(--ink);margin:6px 0 8px}
+  .ctl-label .tag{font-size:11px;color:var(--sub);font-weight:400;margin-left:6px}
+  .cfg-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#f4f7fc;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+  .step-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:18px;cursor:pointer;color:var(--ink);font-weight:700;line-height:1;transition:.15s}
+  .step-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .step-btn:disabled{opacity:.45;cursor:not-allowed}
+  select.input-min,input.input-min{width:64px;text-align:center;padding:7px 4px}
+  .input-min{font-size:17px;font-weight:700}
+  .unit-min{font-size:13px;color:var(--sub)}
+  .presets{display:flex;gap:7px;margin-left:auto;flex-wrap:wrap}
+  .preset{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:13px;cursor:pointer;color:var(--ink);font-weight:600;transition:.15s}
+  .preset:hover,.preset.on{border-color:var(--accent);background:var(--accent);color:#fff}
+  .preset:disabled{opacity:.45;cursor:not-allowed}
+  .cfg-row + .ctl-label{margin-top:16px}
+  .timer-actions{display:flex;gap:12px;margin-top:18px}
+  .timer-start{flex:1;padding:13px 0;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(53,97,224,.25);transition:.15s}
+  .timer-start:hover{filter:brightness(1.06)}
+  .timer-reset{padding:13px 26px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--sub);font-size:15px;cursor:pointer;transition:.15s}
+  .timer-reset:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* -------- 每日签到 -------- */
+  .checkin-card{margin:0 0 26px;width:100%;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 26px 22px;border:1px solid var(--line);background:linear-gradient(180deg,#ffffff,#f7fbff)}
+  .checkin-head{font-size:17px;font-weight:700;display:flex;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center}
+  .checkin-sub{font-size:12px;color:var(--sub);font-weight:400}
+  .checkin-body{display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap;margin:16px 0 10px}
+  .checkin-stats{display:flex;gap:32px}
+  .stat{display:flex;flex-direction:column;align-items:center}
+  .stat b{font-size:30px;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1}
+  .stat span{font-size:12px;color:var(--sub);margin-top:3px}
+  .checkin-btn{padding:12px 30px;border:none;border-radius:999px;font-size:16px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;box-shadow:0 8px 20px rgba(53,97,224,.25);transition:.15s}
+  .checkin-btn:hover{filter:brightness(1.06)}
+  .checkin-btn.done{background:#e9f3e4;color:#2d8a4e;box-shadow:none;cursor:default}
+  .checkin-week{display:flex;justify-content:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .wk{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .wk .sq{width:36px;height:36px;border-radius:9px;border:2px solid #dfe6f0;background:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-weight:600}
+  .wk .sq.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .wk .sq.today{border-color:var(--accent);box-shadow:0 0 0 3px rgba(53,97,224,.15)}
+  .wk span{font-size:11px;color:var(--sub)}
+
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:stretch;width:100%;margin:0 0 26px}
+  .row2 .checkin-card, .row2 .settings{margin-top:0;margin-bottom:0}
+  @media(max-width:880px){.row2{grid-template-columns:1fr}}
+
+  /* -------- 签到日历（内嵌于每日签到卡） -------- */
+  .cal-inner{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+  .cal-head{display:flex;align-items:center;justify-content:center;gap:16px;font-weight:700;font-size:15px}
+  .cal-title{letter-spacing:.5px;width:120px;text-align:center}
+  .cal-nav{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;cursor:pointer;line-height:1}
+  .cal-nav:hover{border-color:var(--accent);color:var(--accent)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,36px);gap:6px;justify-content:center;margin-top:10px}
+  .cal-dow{text-align:center;font-size:11px;color:var(--sub);padding:2px 0}
+  .cal-cell{width:36px;height:36px;border-radius:9px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--ink);position:relative}
+  .cal-cell.empty{background:transparent;border:none}
+  .cal-cell.signed{background:var(--accent);border-color:var(--accent);color:#fff}
+  .cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 2px rgba(53,97,224,.15)}
+  .cal-cell .mark{position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:#fff;color:var(--accent);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+  .cal-legend{display:flex;justify-content:center;gap:22px;margin-top:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+  .cal-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .cal-legend .lg-signed{background:var(--accent);border:1px solid var(--accent)}
+  .cal-legend .lg-today{background:#fff;border:1px solid var(--accent)}
+
+  .toast{position:fixed;left:50%;top:20px;transform:translateX(-50%) translateY(-140%);background:#2b3440;color:#fff;padding:13px 22px;border-radius:12px;font-size:15px;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:99;transition:.35s;max-width:90%;text-align:center}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast b{color:#ffd866}
+
+  footer{text-align:center;color:var(--sub);font-size:12px;margin-top:24px;opacity:.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>📚 每日学习任务安排</h1>
+    <div class="today">
+      <span id="dateLabel">—</span>
+      <span>现在 <span class="now" id="nowLabel">--:--</span></span>
+    </div>
+  </header>
+  <div class="unlock-note" id="unlockNote">🔊 请点击页面任意位置一次，以开启声音提醒权限</div>
+
+  <div class="status-bar">
+    <div class="pill"><span class="dot" id="stMor"></span>上午学习</div>
+    <div class="pill"><span class="dot" id="stAft"></span>下午学习</div>
+    <div class="pill"><span class="dot" id="stEve"></span>晚上学习</div>
+    <div class="pill"><span class="dot rest" id="stRest"></span>休息提醒</div>
+  </div>
+
+  <div class="timer-card" id="timerCard">
+    <div class="timer-head">⏱️ 学习计时器 <span class="timer-sub">按需设定学习与休息时长，到点自动响铃</span></div>
+    <div class="timer-body">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 220 220">
+          <circle class="ring-bg" cx="110" cy="110" r="98"></circle>
+          <circle class="ring-fg" id="timerRing" cx="110" cy="110" r="98"></circle>
+        </svg>
+        <div class="ring-center">
+          <div class="timer-mode" id="timerMode">学习</div>
+          <div class="timer-num" id="timerNum">45:00</div>
+          <div class="timer-state" id="timerState">准备开始</div>
+        </div>
+      </div>
+
+      <div class="timer-controls">
+        <div class="ctl-label">🎯 学习时长<span class="tag">建议单次 25–90 分钟</span></div>
+        <div class="cfg-row">
+          <button class="step-btn" data-adj="-5" data-which="work">−</button>
+          <input type="text" class="input-min" id="timerWork" value="45" inputmode="numeric">
+          <button class="step-btn" data-adj="5" data-which="work">＋</button>
+          <span class="unit-min">分钟</span>
+          <div class="presets" id="timerPresets">
+            <button class="preset" data-v="25">25</button>
+            <button class="preset on" data-v="45">45</button>
+            <button class="preset" data-v="60">60</button>
+            <button class="preset" data-v="90">90</button>
+            <button class="preset" data-v="120">120</button>
+          </div>
+        </div>
+
+        <div class="ctl-label">☕ 休息时长<span class="tag">普通休息或番茄间隙</span></div>
+        <div class="cfg-row">
+          <button class="step-btn" data-adj="-1" data-which="rest">−</button>
+          <input type="text" class="input-min" id="timerRest" value="10" inputmode="numeric">
+          <button class="step-btn" data-adj="1" data-which="rest">＋</button>
+          <span class="unit-min">分钟</span>
+          <div class="presets" id="timerRestPresets">
+            <button class="preset" data-v="5">5</button>
+            <button class="preset" data-v="8">8</button>
+            <button class="preset on" data-v="10">10</button>
+            <button class="preset" data-v="15">15</button>
+            <button class="preset" data-v="20">20</button>
+          </div>
+        </div>
+
+        <div class="timer-actions">
+          <button class="timer-start" id="timerStart">▶ 开始学习</button>
+          <button class="timer-reset" id="timerReset">重置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cards" class="cards"></div>
+
+  <div class="row2">
+  <div class="checkin-card" id="checkinCard">
+    <div class="checkin-head">📅 每日签到 <span class="checkin-sub" id="checkinSub">每天来报个到，坚持就有收获</span></div>
+    <div class="checkin-body">
+      <div class="checkin-stats">
+        <div class="stat"><b id="checkinStreak">0</b><span>连续签到（天）</span></div>
+        <div class="stat"><b id="checkinTotal">0</b><span>累计签到（天）</span></div>
+      </div>
+      <button class="checkin-btn" id="checkinBtn">✅ 立即签到</button>
+    </div>
+    <div class="cal-inner">
+      <div class="cal-head">
+        <button class="cal-nav" id="calPrev">◀</button>
+        <span class="cal-title" id="calTitle">—</span>
+        <button class="cal-nav" id="calNext">▶</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <span><i class="lg-signed"></i>已签到</span>
+        <span><i class="lg-today"></i>今天</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings">
+    <h2>⚙️ 设置与提醒</h2>
+    <div class="opt">
+      <div class="lbl"><b>番茄钟休息提醒</b> — 连续学习到设定时长后，铃声提示休息</div>
+      <div class="switch"><input type="checkbox" id="restToggle"><span class="slider"></span></div>
+    </div>
+    <div class="opt">
+      <div class="lbl">学习时长
+        <select id="studyLen">
+          <option value="25">25 分钟</option>
+          <option value="45" selected>45 分钟</option>
+          <option value="50">50 分钟</option>
+          <option value="60">60 分钟</option>
+          <option value="90">90 分钟</option>
+        </select>
+        &nbsp;休息时长
+        <select id="restLen">
+          <option value="5">5 分钟</option>
+          <option value="10" selected>10 分钟</option>
+          <option value="15">15 分钟</option>
+          <option value="20">20 分钟</option>
+        </select>
+      </div>
+    </div>
+    <div class="opt">
+      <div class="lbl"><b>到点铃声提示</b> — 每个学习时段开始时会响铃</div>
+      <div class="switch"><input type="checkbox" id="ringToggle" checked><span class="slider"></span></div>
+      <button class="btn-test" id="testBtn">▶ 试听铃声</button>
+    </div>
+  </div>
+  </div>
+
+  <footer>到时段开始、番茄钟休息时，页面会弹窗并播放柔和铃声。请保持本页面打开。</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SESSIONS = [
+  { id:'mor', name:'上午学习', time:'08:00–12:00', head:'morning',
+    items:[ {t:'主科核心学习', d:'侧重理解型科目'}, {t:'难点攻坚', d:'集中突破薄弱点'}, {t:'预习新课内容', d:'为当天做铺垫'} ] },
+  { id:'aft', name:'下午学习', time:'14:00–18:00', head:'afternoon',
+    items:[ {t:'课后练习', d:'配套习题巩固'}, {t:'记忆型内容复习', d:'背诵、整理笔记'}, {t:'专项训练', d:'针对性方法练习'} ] },
+  { id:'eve', name:'晚上学习', time:'19:30–22:30', head:'evening',
+    items:[ {t:'阅读拓展', d:'课外阅读/资料'}, {t:'当日复盘', d:'总结今天所学'}, {t:'明日计划', d:'列出明日任务'} ] }
+];
+
+let settings = {rest:true, ring:true, sLen:45, rLen:10};
+let checkData = {}; let todayKey = '';
+
+function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb }catch{ return fb } }
+function save(k, v){ localStorage.setItem(k, JSON.stringify(v)) }
+function dateStr(d){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+function toMin(str){ const [h,m]=str.split(':').map(Number); return h*60+m; }
+function minToStr(m){ m=Math.max(0,m); return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+
+function initState(){
+  settings = Object.assign(settings, load('dss_settings', {}));
+  checkData = load('dss_checks', {});
+  todayKey = dateStr(new Date());
+  if(!checkData[todayKey]) checkData[todayKey] = {};
+  document.getElementById('restToggle').checked = settings.rest;
+  document.getElementById('ringToggle').checked = settings.ring;
+  document.getElementById('studyLen').value = settings.sLen;
+  document.getElementById('restLen').value = settings.rLen;
+}
+function persist(){ save('dss_settings', settings); save('dss_checks', checkData); }
+
+/* -------- 柔和铃声（Web Audio 合成，无需外部文件）-------- */
+let actx = null;
+function ensureAudio(){
+  if(!actx){ try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ actx=null; return; } }
+  if(actx.state === 'suspended') actx.resume();
+}
+function playSequence(freqs){
+  if(!settings.ring) return;
+  if(!actx){ ensureAudio(); }
+  if(!actx || actx.state !== 'running') return;
+  const t = actx.currentTime;
+  freqs.forEach((freq, i) => {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    const st = t + i * 0.16;
+    g.gain.setValueAtTime(0, st);
+    g.gain.linearRampToValueAtTime(0.35, st + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, st + 1.4);
+    o.connect(g); g.connect(actx.destination);
+    o.start(st); o.stop(st + 1.5);
+  });
+}
+/* 开始音：上行提示 */
+function chimeStart(){ playSequence([523.25, 659.25, 783.99, 1046.5]); }
+/* 结束音：下行提示（与开始音区分） */
+function chimeEnd(){ playSequence([1046.5, 783.99, 659.25, 523.25]); }
+
+/* -------- 提示弹窗 -------- */
+let toastTimer = null;
+function toast(html){
+  const el = document.getElementById('toast');
+  el.innerHTML = html; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 5200);
+}
+
+/* -------- 渲染 -------- */
+function renderCards(){
+  const box = document.getElementById('cards');
+  box.innerHTML = '';
+  SESSIONS.forEach(s => {
+    const sec = document.createElement('section');
+    sec.className = 'card';
+    let doneCount = 0;
+    const itemsHtml = s.items.map((it, i) => {
+      const key = `${s.id}-${i}`;
+      const done = !!(checkData[todayKey] && checkData[todayKey][key]);
+      if(done) doneCount++;
+      return `<div class="item${done?' done':''}" data-key="${key}">
+        <div class="chk">✓</div>
+        <div class="txt">${it.t}<span class="sub">${it.d}</span></div>
+      </div>`;
+    }).join('');
+    const pct = Math.round(doneCount / s.items.length * 100);
+    sec.innerHTML = `
+      <div class="card-head ${s.head}">
+        <div class="stage"></div>
+        <div class="name">${s.name}</div>
+        <div class="time">🕒 ${s.time}</div>
+      </div>
+      <div class="count-box">
+        <div class="label">到点倒计时</div>
+        <div class="num">--:--</div>
+      </div>
+      <div class="items">${itemsHtml}</div>
+      <div class="foot">
+        <div class="prog"><span>今日完成</span> <b>${doneCount}/${s.items.length}（${pct}%）</b>
+        <div class="bar"><i style="width:${pct}%"></i></div></div>
+      </div>`;
+    box.appendChild(sec);
+  });
+  box.onclick = e => {
+    const item = e.target.closest('.item');
+    if(!item) return;
+    const key = item.dataset.key;
+    if(!checkData[todayKey]) checkData[todayKey] = {};
+    checkData[todayKey][key] = !checkData[todayKey][key];
+    persist(); renderCards();
+  };
+}
+
+/* -------- 时钟 + 时段状态 -------- */
+let activeCache = {};
+function tick(){
+  const now = new Date();
+  const m = now.getHours()*60 + now.getMinutes();
+  document.getElementById('dateLabel').textContent =
+    `${dateStr(now)} 星期${'日一二三四五六' [now.getDay()]}`;
+  document.getElementById('nowLabel').textContent = minToStr(m);
+
+  const cards = document.querySelectorAll('.card');
+  SESSIONS.forEach((s, i) => {
+    const [a, b] = s.time.split('–').map(x => toMin(x.trim()));
+    const card = cards[i];
+    const stageEl = card.querySelector('.stage');
+    const countEl = card.querySelector('.num');
+    const dot = document.getElementById('st' + s.id.charAt(0).toUpperCase() + s.id.slice(1));
+    let state, rem;
+    if(m >= a && m < b){ state='active'; rem = b - m; }
+    else if(m < a){ state='next';  rem = a - m; }
+    else { state='done'; rem = 0; }
+
+    card.classList.toggle('active', state==='active');
+    if(state==='active') stageEl.textContent = '进行中';
+    else if(state==='next') stageEl.textContent = `开启倒计时 ${minToStr(rem)}`;
+    else stageEl.textContent = '已结束';
+    stageEl.style.display = (state!=='idle') ? 'block' : 'none';
+    dot.className = state==='active' ? 'dot act' : 'dot';
+    countEl.textContent = (state==='active'||state==='next') ? minToStr(rem) : '--:--';
+    countEl.classList.toggle('slot-active', state==='active');
+
+    // 时段开始 / 结束边界提醒（前后各响一次）
+    const prev = activeCache[s.id] || 'idle';
+    activeCache[s.id] = state;
+    if(settings.ring && state==='active' && prev!=='active'){
+      chimeStart();
+      toast(`🔔 ${s.name}开始！<br><b>${s.time}</b>　专注投入 💪`);
+    } else if(settings.ring && state==='done' && prev==='active'){
+      chimeEnd();
+      toast(`🔔 ${s.name}结束！<br>时间到，起来休息活动一下 ☕`);
+    }
+  });
+
+  pomodoro(now, m);
+}
+
+/* -------- 番茄钟休息提醒 -------- */
+let focusStart = null, restCount = 0;
+function pomodoro(now, m){
+  const restDot = document.getElementById('stRest');
+  restDot.className = 'dot rest';
+  const activeCard = document.querySelector('.card.active');
+  if(!settings.rest || !activeCard){
+    focusStart = null; restCount = 0; return;
+  }
+  if(!focusStart) focusStart = now.getTime();
+  const mins = (now.getTime() - focusStart) / 60000;
+  if(mins >= settings.sLen){
+    restCount++;
+    focusStart = now.getTime();
+    ensureAudio(); chimeStart();
+    toast(`⏸️ 已连续学习 ${settings.sLen} 分钟！<br>休息 ${settings.rLen} 分钟，喝口水、活动一下～（第 ${restCount} 次）`);
+  }
+}
+
+/* -------- 事件 -------- */
+function bindEvents(){
+  document.getElementById('restToggle').addEventListener('change', e => {
+    settings.rest = e.target.checked; persist();
+    toast(settings.rest ? '已开启番茄钟休息提醒' : '已关闭休息提醒');
+  });
+  document.getElementById('ringToggle').addEventListener('change', e => {
+    settings.ring = e.target.checked; persist();
+    toast(settings.ring ? '已开启到点铃声' : '已关闭到点铃声');
+  });
+  document.getElementById('studyLen').addEventListener('change', e => { settings.sLen = +e.target.value; persist(); });
+  document.getElementById('restLen').addEventListener('change', e => { settings.rLen = +e.target.value; persist(); });
+  document.getElementById('testBtn').addEventListener('click', () => {
+      ensureAudio(); chimeStart();
+      setTimeout(chimeEnd, 1500);                                  // 先放开始音，稍后再放结束音
+      toast('▶ 先「开始音」，1.5 秒后再放「结束音」');
+    });
+
+  // 一次性初始化音频（浏览器要求用户手势）
+  const unlock = () => { ensureAudio(); document.getElementById('unlockNote').style.display='none'; };
+  document.addEventListener('click', unlock, { once:true });
+}
+
+/* -------- 学习计时器 -------- */
+const RING_C = 615.75;
+const T = { work:45, rest:10, mode:'work', totalMs:0, remainingMs:0, endAt:0, running:false, intervalId:null };
+function fmtMs(ms){ const s=Math.max(0, Math.ceil(ms/1000)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function clampInt(v,min,max,fb){ const n=parseInt(v,10); return Number.isFinite(n) ? Math.min(max,Math.max(min,n)) : fb; }
+function setTotalMsFromMode(){ T.totalMs = (T.mode==='work' ? T.work : T.rest) * 60000; T.remainingMs = T.totalMs; }
+function renderTimer(){
+  const card = document.getElementById('timerCard');
+  card.className = 'timer-card' + (T.mode==='rest' ? ' mode-rest' : '');
+  document.getElementById('timerMode').textContent = T.mode==='work' ? '学习' : '休息';
+  document.getElementById('timerNum').textContent = fmtMs(T.remainingMs);
+  const pct = T.totalMs>0 ? T.remainingMs/T.totalMs : 1;
+  document.getElementById('timerRing').style.strokeDashoffset = String(RING_C*(1-pct));
+  document.getElementById('timerState').textContent = T.running ? (T.mode==='work'?'学习中…':'休息中…') : '准备开始';
+}
+function setStartBtn(){
+  const btn = document.getElementById('timerStart');
+  if(T.running) btn.textContent = '⏸ 暂停';
+  else if(T.mode==='work' && T.remainingMs<T.totalMs && T.remainingMs>0) btn.textContent = '▶ 继续学习';
+  else btn.textContent = '▶ 开始学习';
+}
+function setSetupDisabled(v){
+  document.querySelectorAll('#timerCard .input-min,#timerCard .step-btn,#timerCard .preset').forEach(el => el.disabled = v);
+}
+function syncPresetActive(){
+  document.querySelectorAll('#timerPresets .preset').forEach(p => p.classList.toggle('on', parseInt(p.dataset.v,10) === T.work));
+  document.querySelectorAll('#timerRestPresets .preset').forEach(p => p.classList.toggle('on', parseInt(p.dataset.v,10) === T.rest));
+}
+function readInputs(){
+  T.work = clampInt(document.getElementById('timerWork').value,1,300,45);
+  T.rest = clampInt(document.getElementById('timerRest').value,1,120,10);
+  settings.tWork = T.work; settings.tRest = T.rest; persist();
+  document.getElementById('timerWork').value = T.work;
+  document.getElementById('timerRest').value = T.rest;
+}
+function timerRefreshDurations(){
+  readInputs();
+  if(!T.running && T.mode==='work'){ setTotalMsFromMode(); }
+  renderTimer(); setStartBtn();
+}
+function timerReset(){
+  if(T.intervalId){ clearInterval(T.intervalId); T.intervalId=null; }
+  T.running=false; T.mode='work'; readInputs();
+  setTotalMsFromMode(); renderTimer(); setStartBtn(); setSetupDisabled(false);
+}
+function timerStart(){
+  if(T.running){
+    clearInterval(T.intervalId); T.intervalId=null;
+    T.running=false; renderTimer(); setStartBtn(); setSetupDisabled(false);
+    return;
+  }
+  if(T.remainingMs<=0){ readInputs(); setTotalMsFromMode(); }
+  T.endAt = Date.now() + T.remainingMs;
+  T.running = true;
+  if(T.intervalId) clearInterval(T.intervalId);
+  T.intervalId = setInterval(timerTick, 250);
+  renderTimer(); setStartBtn(); setSetupDisabled(true);
+}
+function timerTick(){
+  if(!T.running) return;
+  T.remainingMs = T.endAt - Date.now();
+  if(T.remainingMs<=0){ finishTimer(); } else { renderTimer(); setStartBtn(); }
+}
+function finishTimer(){
+  ensureAudio(); chimeStart();
+  if(T.mode==='work'){
+    toast(`✅ 本轮学习完成！<br><b>休息 ${T.rest} 分钟</b>，喝口水、活动一下 ☕`);
+    T.mode='rest'; T.totalMs=T.rest*60000; T.remainingMs=T.totalMs;
+    T.endAt = Date.now() + T.remainingMs; T.running = true;
+  } else {
+    toast(`☕ 休息结束！<br>开始下一轮学习 💪`);
+    T.mode='work'; T.totalMs=T.work*60000; T.remainingMs=T.totalMs;
+    T.running=false;
+    if(T.intervalId){ clearInterval(T.intervalId); T.intervalId=null; }
+    setSetupDisabled(false);
+  }
+  renderTimer(); setStartBtn();
+}
+function initTimer(){
+  T.work = clampInt(settings.tWork,1,300,45);
+  T.rest = clampInt(settings.tRest,1,120,10);
+  document.getElementById('timerWork').value = T.work;
+  document.getElementById('timerRest').value = T.rest;
+  setTotalMsFromMode(); renderTimer(); syncPresetActive();
+
+  document.getElementById('timerStart').addEventListener('click', timerStart);
+  document.getElementById('timerReset').addEventListener('click', timerReset);
+  document.getElementById('timerWork').addEventListener('change', timerRefreshDurations);
+  document.getElementById('timerRest').addEventListener('change', timerRefreshDurations);
+  document.querySelectorAll('#timerCard .step-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      if(T.running) return;
+      const which = b.dataset.which, adj = parseInt(b.dataset.adj,10);
+      const input = document.getElementById(which==='work'?'timerWork':'timerRest');
+      const maxv = which==='work' ? 300 : 120;
+      let v = clampInt(input.value,1,maxv, which==='work'?45:10) + adj;
+      v = Math.min(maxv, Math.max(1,v));
+      input.value = v;
+      readInputs();
+      if(T.mode==='work' && !T.running){ setTotalMsFromMode(); }
+      renderTimer(); setStartBtn(); syncPresetActive();
+    });
+  });
+  document.querySelectorAll('#timerCard .preset').forEach(p => {
+    p.addEventListener('click', () => {
+      if(T.running) return;
+      const isRest = !!p.closest('#timerRestPresets');
+      document.getElementById(isRest ? 'timerRest' : 'timerWork').value = p.dataset.v;
+      readInputs(); setTotalMsFromMode(); renderTimer(); setStartBtn(); syncPresetActive();
+    });
+  });
+}
+
+/* -------- 每日签到 -------- */
+let checkin = { dates: [] };
+function initCheckin(){
+  checkin = load('dss_checkin', { dates: [] });
+  if(!Array.isArray(checkin.dates)) checkin.dates = [];
+  renderCheckin();
+  document.getElementById('checkinBtn').addEventListener('click', doCheckin);
+}
+function todaySigned(){ return checkin.dates.indexOf(todayKey) !== -1; }
+function calcStreak(){
+  const set = new Set(checkin.dates);
+  let streak = 0, d = new Date();
+  if(!set.has(dateStr(d))) d.setDate(d.getDate() - 1);   // 今天未签则从昨天起算当前连续
+  while(set.has(dateStr(d))){ streak++; d.setDate(d.getDate() - 1); }
+  return streak;
+}
+function doCheckin(){
+  if(todaySigned()){ toast('今天已经签过到啦，明天再来 ✌️'); return; }
+  checkin.dates.push(todayKey);
+  save('dss_checkin', checkin);
+  ensureAudio(); chimeStart();
+  renderCheckin();
+  const t0 = new Date();
+  if(calY === t0.getFullYear() && calM === t0.getMonth()) renderCal();
+  toast(`🎉 签到成功！已连续签到 <b>${calcStreak()} 天</b>，坚持就是胜利！`);
+}
+function renderCheckin(){
+  const signed = todaySigned();
+  document.getElementById('checkinStreak').textContent = calcStreak();
+  document.getElementById('checkinTotal').textContent = checkin.dates.length;
+  const btn = document.getElementById('checkinBtn');
+  btn.classList.toggle('done', signed);
+  btn.textContent = signed ? '✅ 今日已签到' : '✅ 立即签到';
+}
+/* -------- 签到日历 -------- */
+let calY, calM;
+function initCal(){
+  const now = new Date(); calY = now.getFullYear(); calM = now.getMonth();
+  document.getElementById('calPrev').addEventListener('click', () => { calM--; if(calM < 0){ calM = 11; calY--; } renderCal(); });
+  document.getElementById('calNext').addEventListener('click', () => { calM++; if(calM > 11){ calM = 0; calY++; } renderCal(); });
+  renderCal();
+}
+function renderCal(){
+  document.getElementById('calTitle').textContent = `${calY}年${calM + 1}月`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['一','二','三','四','五','六','日'].forEach(d => {
+    const dow = document.createElement('div'); dow.className = 'cal-dow'; dow.textContent = d; grid.appendChild(dow);
+  });
+  const set = new Set(checkin.dates);
+  const first = new Date(calY, calM, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const dim = new Date(calY, calM + 1, 0).getDate();
+  const todayDs = dateStr(new Date());
+  for(let i = 0; i < offset; i++){ const e = document.createElement('div'); e.className = 'cal-cell empty'; grid.appendChild(e); }
+  const pad = n => String(n).padStart(2, '0');
+  for(let d = 1; d <= dim; d++){
+    const ds = `${calY}-${pad(calM + 1)}-${pad(d)}`;
+    const signed = set.has(ds), isToday = (ds === todayDs);
+    const c = document.createElement('div');
+    c.className = 'cal-cell' + (signed ? ' signed' : '') + (isToday ? ' today' : '');
+    c.textContent = d;
+    if(signed){ const m = document.createElement('span'); m.className = 'mark'; m.textContent = '✓'; c.appendChild(m); }
+    grid.appendChild(c);
+  }
+}
+
+initState();
+renderCards();
+bindEvents();
+initTimer();
+initCheckin();
+initCal();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
